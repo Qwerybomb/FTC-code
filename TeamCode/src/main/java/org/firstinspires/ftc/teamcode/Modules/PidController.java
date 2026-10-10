@@ -3,19 +3,30 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import java.util.ArrayList;
 
 public class PidController {
 
     // Pre-Calculated Gains //
-    private float Kp;
-    private float Ki;
-    private float Kd;
-    private float Dt;
+    private final float Kp = 0;
+    private final float Ki = 0;
+    private final float Kd = 0;
+
+    // pre determined loop time in Ms //
+    private final float Dt = 100;
 
     // Motor //
     private DcMotor Motor;
+    private float ECPerRotation = 100;
+
+    // elapsed time //
+    private ElapsedTime elapsedTime;
+
+    // integration //
+    private float integral = 0;
+    private float integrationStartTime = 0;
 
     // Error visualization helper //
     Telemetry telemetry;
@@ -34,6 +45,8 @@ public class PidController {
         this.telemetry = telemetry;
         UpdateTarget(Target);
         Motor = HwMap.get(DcMotor.class, "ExampleMotor");
+        elapsedTime = new ElapsedTime();
+        elapsedTime.reset();
     }
 
     /**
@@ -58,11 +71,25 @@ public class PidController {
     }
 
     /**
-     * function to calculate the I in PID
+     * function to calculate the I in PID. Reminder -> All time in MS
+     *
      * @return the I in PID
      */
-    private float CalculateIntegral() {
-        return Ki;
+    private double CalculateIntegral() {
+        float startTime = integrationStartTime;
+        float endTime = (float) elapsedTime.milliseconds();
+        float subdivisions = 50;
+
+        float h = (endTime - startTime) / subdivisions;
+        float sum = 0.5f * (getErrorAtTime(startTime) + getErrorAtTime(endTime));
+        for (int i = 1; i < subdivisions; i++) {
+            sum += getErrorAtTime(startTime + i * h);
+        }
+
+
+        integrationStartTime = (float) elapsedTime.milliseconds();
+        integral += sum * h;
+        return integral * Ki;
     }
 
     /**
@@ -79,6 +106,28 @@ public class PidController {
      */
     private float CalculateProcessVariable() {
         return Motor.getCurrentPosition();
+    }
+
+    /**
+     * function to calculate error at the given time. uses linear easing between values.
+     * @param Time time to request in MS
+     * @return value at the time.
+     */
+    private float getErrorAtTime(float Time) {
+        int errorPoints = Error.size() - 1;
+        float currentRunTime = (float) elapsedTime.milliseconds();
+
+        float currentPosition = remap(0, currentRunTime, 0, errorPoints, Time);
+
+        int errorBottomBound = (int) Math.floor(currentPosition);
+        int errorTopBound = (int) Math.ceil(currentPosition);
+        float deviation = errorTopBound - currentPosition;
+
+        return (Error.get(errorBottomBound) * (deviation)) + (Error.get(errorTopBound) * (1 - deviation));
+    }
+
+    private float remap(float low1, float high1, float low2, float high2, float value) {
+        return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
     }
 
     /**
