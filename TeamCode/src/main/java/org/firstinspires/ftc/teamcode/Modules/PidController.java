@@ -1,11 +1,7 @@
 package org.firstinspires.ftc.teamcode.Modules;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.util.ElapsedTime;
-
-import java.util.ArrayList;
 
 public class PidController {
 
@@ -14,26 +10,27 @@ public class PidController {
     private final float Ki = 0;
     private final float Kd = 0;
 
-    // pre determined loop time in Ms //
+    // Timings (all in ms) //
     private final float Dt = 100;
 
     // Motor //
-    private DcMotor Motor;
-    private float ECPerRotation = 100;
-
-    // elapsed time //
-    private ElapsedTime elapsedTime;
+    private final DcMotor Motor;
+    private final float encodersPerRevolution = 537.7f;
 
     // integration //
     private float integral = 0;
-    private float integrationStartTime = 0;
 
     // Error visualization helper //
     Telemetry telemetry;
+    boolean printTelemetry;
 
     // Error & Error calculatory values //
     private float Target;
-    private final ArrayList<Float> Error = new ArrayList<Float>();
+    private float currentError;
+    private float previousError;
+
+    // process value calculations //
+    private float motorPreviousEncoderCount = 0;
 
     /**
      * Assign initial values for all robot or externally dependent objects
@@ -41,20 +38,29 @@ public class PidController {
      * @param telemetry Telemetry for the Driver Station
      * @param Target Desired Initial Target value
      */
-    public PidController(HardwareMap HwMap, Telemetry telemetry, Float Target) {
+    public PidController(HardwareMap HwMap, Telemetry telemetry, Float Target, boolean printTelemetry) {
         this.telemetry = telemetry;
+        this.printTelemetry = printTelemetry;
+
         UpdateTarget(Target);
-        Motor = HwMap.get(DcMotor.class, "ExampleMotor");
-        elapsedTime = new ElapsedTime();
-        elapsedTime.reset();
+        Motor = HwMap.get(DcMotor.class, "PidMotor");
     }
 
     /**
      * Primary control loop for the PID mechanism.
      */
     public void PidLoop() {
-        Error.add(Target - CalculateProcessVariable());
+        previousError = currentError;
+        currentError = Target - CalculateProcessVariable();
         Motor.setPower(CalculateProportional() + CalculateDerivative() + CalculateIntegral());
+
+        if (printTelemetry) {
+            telemetry.addData("currentError", currentError);
+            telemetry.addData("Process Variable", Target - currentError);
+            telemetry.addData("Motor Power (u(t))", Motor.getPower());
+            telemetry.update();
+        }
+
         try {
             Thread.sleep((long) Dt);
         } catch (InterruptedException e) {
@@ -67,29 +73,16 @@ public class PidController {
      * @return the P in PID
      */
     private float CalculateProportional() {
-        return Kp * Error.get(Error.size() - 1);
+        return Kp * currentError;
     }
 
     /**
-     * function to calculate the I in PID. Reminder -> All time in MS
-     *
+     * function to calculate the I in PID. Reminder -> All time in Ms
      * @return the I in PID
      */
-    private double CalculateIntegral() {
-        float startTime = integrationStartTime;
-        float endTime = (float) elapsedTime.milliseconds();
-        float subdivisions = 50;
-
-        float h = (endTime - startTime) / subdivisions;
-        float sum = 0.5f * (getErrorAtTime(startTime) + getErrorAtTime(endTime));
-        for (int i = 1; i < subdivisions; i++) {
-            sum += getErrorAtTime(startTime + i * h);
-        }
-
-
-        integrationStartTime = (float) elapsedTime.milliseconds();
-        integral += sum * h;
-        return integral * Ki;
+    private float CalculateIntegral() {
+        integral = Ki * ((integral + currentError) * Dt);
+        return integral;
     }
 
     /**
@@ -97,37 +90,22 @@ public class PidController {
      * @return the D in PID
      */
     private float CalculateDerivative() {
-        return Kd * ((Error.get(Error.size() - 1) - Error.get(Error.size() - 2)) / Dt);
+        return Kd * (currentError - previousError) / Dt;
     }
 
     /**
-     * Calculate the Process Variable.
+     * Calculate the Process Variable (RPM) using the previously known encoder count and the amount of encoder counts per revolution, as well at the known time-per-iteration (could be improved with added deltaTime).
      * @return Process Variable
      */
     private float CalculateProcessVariable() {
-        return Motor.getCurrentPosition();
-    }
 
-    /**
-     * function to calculate error at the given time. uses linear easing between values.
-     * @param Time time to request in MS
-     * @return value at the time.
-     */
-    private float getErrorAtTime(float Time) {
-        int errorPoints = Error.size() - 1;
-        float currentRunTime = (float) elapsedTime.milliseconds();
+        // calculate the process variable
+        float processVariable =  ((Motor.getCurrentPosition() - motorPreviousEncoderCount) / encodersPerRevolution);
+        processVariable *=  (60000 / Dt);
 
-        float currentPosition = remap(0, currentRunTime, 0, errorPoints, Time);
-
-        int errorBottomBound = (int) Math.floor(currentPosition);
-        int errorTopBound = (int) Math.ceil(currentPosition);
-        float deviation = errorTopBound - currentPosition;
-
-        return (Error.get(errorBottomBound) * (deviation)) + (Error.get(errorTopBound) * (1 - deviation));
-    }
-
-    private float remap(float low1, float high1, float low2, float high2, float value) {
-        return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
+        // set previous values to be read next [function call] -> (iteration)
+        motorPreviousEncoderCount = Motor.getCurrentPosition();
+        return processVariable;
     }
 
     /**
