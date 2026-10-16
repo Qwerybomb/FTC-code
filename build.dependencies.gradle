@@ -1,9 +1,14 @@
 repositories {
+    maven { url = 'https://maven.brott.dev/' }
     mavenCentral()
     google() // Needed for androidx
 }
 
 dependencies {
+    // 192.168.43.1:8080/dash for dashboard
+    implementation('com.acmerobotics.dashboard:dashboard:0.6.0') {
+        exclude group: 'org.firstinspires.ftc'
+    }
     implementation 'org.firstinspires.ftc:Inspection:12.0.0'
     implementation 'org.firstinspires.ftc:Blocks:12.0.0'
     implementation 'org.firstinspires.ftc:RobotCore:12.0.0'
