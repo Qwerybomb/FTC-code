@@ -15,20 +15,22 @@ public class PidLoopTuning extends LinearOpMode {
 
         PidController PID = new PidController(hardwareMap, 200f, true);
 
-        float prop = 0.0f;
-        PID.setProportional(prop);
+        // actual ultimate gain is 3.0 -> 3.1
+        float ultimate_gain = 0f;
 
         while (opModeIsActive()) {
             if (gamepad1.aWasPressed()) {
-                prop += 0.1f;
-                PID.setProportional(prop);
+                ultimate_gain += 0.05f;
             }
             if (gamepad1.bWasPressed()) {
-                prop -= 0.1f;
-                PID.setProportional(prop);
+                ultimate_gain -= 0.05f;
             }
+            PID.setPidForTuning(ultimate_gain, 0, 0);
+
             PID.Loop();
-            PID.getTelemetry().addData("Kp", prop);
+            PID.getTelemetry().addData("Kp", ultimate_gain);
+            PID.getTelemetry().addData("bounds_bottom", 0);
+            PID.getTelemetry().addData("bounds_top", 312);
             PID.updateTelemetry();
         }
     }

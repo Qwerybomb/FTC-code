@@ -39,8 +39,8 @@ public class PidController {
     /**
      * Assign initial values for all robot or externally dependent objects
      * @param HwMap Hardware map of the robot, from which to retrieve the motor
-     * @param telemetry Telemetry for the Driver Station
      * @param Target Desired Initial Target value
+     * @param printTelemetry boolean to define whether or not telemetry should be printed
      */
     public PidController(HardwareMap HwMap, Float Target, boolean printTelemetry) {
         this.telemetry = FtcDashboard.getInstance().getTelemetry();
@@ -58,12 +58,13 @@ public class PidController {
     public void Loop() {
         previousError = currentError;
         currentError = Target - CalculateProcessVariable();
-        currentError = remap(0, maxRPM, 0, 1, currentError);
-        Motor.setPower(CalculateProportional() + CalculateDerivative() + CalculateIntegral());
+
+        float calculated_power = CalculateProportional() + CalculateDerivative() + CalculateIntegral();
+        Motor.setPower(remap(0, maxRPM, 0, 1, calculated_power));
 
         if (printTelemetry) {
             telemetry.addData("currentError", currentError);
-            telemetry.addData("Process Variable (RPM)", Target - remap(0, 1, 0, maxRPM, currentError));
+            telemetry.addData("Process Variable (RPM)", Target - currentError);
             telemetry.addData("Motor Power (u(t))", Motor.getPower());
         }
 
@@ -164,5 +165,11 @@ public class PidController {
     }
     public Telemetry getTelemetry() {
         return this.telemetry;
+    }
+
+    public void setPidForTuning(float P, float I, float D) {
+        Kp = P;
+        Ki = I;
+        Kd = D;
     }
 }
