@@ -5,16 +5,19 @@ import com.acmerobotics.dashboard.FtcDashboard;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 public class PidController {
 
     // Pre-Calculated Gains //
-    private float Kp = 0;
-    private float Ki = 0;
-    private float Kd = 0;
+    public float Kp = 0;
+    public float Ki = 0;
+    public float Kd = 0;
 
     // Timings (all in ms) //
-    private final float Dt = 100;
+    private float activeDeltaTime = 0;
+    private float previousTimePoint = 0;
+    private ElapsedTime time;
 
     // Motor //
     private final DcMotor Motor;
@@ -29,7 +32,7 @@ public class PidController {
     boolean printTelemetry;
 
     // Error & Error calculatory values //
-    private float Target;
+    public float Target;
     private float currentError;
     private float previousError;
 
@@ -50,26 +53,45 @@ public class PidController {
 
         Motor = HwMap.get(DcMotor.class, "PidMotor");
         Motor.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        // precautions
+        time = new ElapsedTime(0);
+        time.reset();
     }
 
     /**
      * Primary control loop for the PID mechanism.
      */
     public void Loop() {
+
+        // calculate the active delta time.
+        activeDeltaTime = (float) (time.milliseconds() - previousTimePoint);
+        previousTimePoint = (float) time.milliseconds();
+
+        // set the error last iteration to the error this iteration
         previousError = currentError;
-        currentError = Target - CalculateProcessVariable();
+
+        // set the current error to the target - PV
+        currentError = Target - CalculateProcessVariable(activeDeltaTime);
 
         float calculated_power = CalculateProportional() + CalculateDerivative() + CalculateIntegral();
         Motor.setPower(remap(0, maxRPM, 0, 1, calculated_power));
 
+        // prints out telemetry. bottom target and top define the ranges
         if (printTelemetry) {
+            telemetry.addData("bounds_bottom", 0);
+            telemetry.addData("target", Target);
+            telemetry.addData("bounds_top", maxRPM);
             telemetry.addData("currentError", currentError);
             telemetry.addData("Process Variable (RPM)", Target - currentError);
             telemetry.addData("Motor Power (u(t))", Motor.getPower());
+            telemetry.addData("current delta time", activeDeltaTime);
+            telemetry.update();
         }
 
+        // sleep for a set amount of time, independent of delta-time, although it does influence it.
         try {
-            Thread.sleep((long) Dt);
+            Thread.sleep((long) 100);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -88,7 +110,7 @@ public class PidController {
      * @return the I in PID
      */
     private float CalculateIntegral() {
-        integral = Ki * ((integral + currentError) * Dt);
+        integral = Ki * ((integral + currentError) * activeDeltaTime);
         return integral;
     }
 
@@ -97,18 +119,19 @@ public class PidController {
      * @return the D in PID
      */
     private float CalculateDerivative() {
-        return Kd * (currentError - previousError) / Dt;
+        return Kd * (currentError - previousError) / activeDeltaTime;
     }
 
     /**
      * Calculate the Process Variable (RPM) using the previously known encoder count and the amount of encoder counts per revolution, as well at the known time-per-iteration (could be improved with added deltaTime).
+     * @param deltaTime the time the previous iteration took to process in milliseconds.
      * @return Process Variable
      */
-    private float CalculateProcessVariable() {
+    private float CalculateProcessVariable(float deltaTime) {
 
         // calculate the process variable
         float processVariable =  ((Motor.getCurrentPosition() - motorPreviousEncoderCount) / encodersPerRevolution);
-        processVariable *=  (60000 / Dt);
+        processVariable *=  (60000 / deltaTime);
 
         // set previous values to be read next [function call] -> (iteration)
         motorPreviousEncoderCount = Motor.getCurrentPosition();
@@ -158,13 +181,6 @@ public class PidController {
      */
     public void setDerivative(float derivative) {
         Kd = derivative;
-    }
-
-    public void updateTelemetry() {
-        telemetry.update();
-    }
-    public Telemetry getTelemetry() {
-        return this.telemetry;
     }
 
     public void setPidForTuning(float P, float I, float D) {
