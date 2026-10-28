@@ -28,7 +28,8 @@ public class PidLoopTuning extends LinearOpMode {
             if (gamepad1.bWasPressed()) {
                 ultimate_gain -= 0.05f;
             }
-            PID.setPidForTuning(ultimate_gain * 0.6f, (1.2f * ultimate_gain) / oscillation_period, (3 * ultimate_gain * oscillation_period) / 40);
+//            PID.setPidForTuning(ultimate_gain * 0.6f, (1.2f * ultimate_gain) / oscillation_period, (3 * ultimate_gain * oscillation_period) / 40);
+            PID.setPidForTuning(ultimate_gain, 0,0);
             telemetry.addData("P", PID.Ki);
             telemetry.addData("I", PID.Ki);
             telemetry.addData("D", PID.Kd);

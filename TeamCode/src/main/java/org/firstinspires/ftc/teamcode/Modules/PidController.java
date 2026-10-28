@@ -49,7 +49,7 @@ public class PidController {
         this.telemetry = FtcDashboard.getInstance().getTelemetry();
         this.printTelemetry = printTelemetry;
 
-        UpdateTarget(Target);
+        updateTarget(Target);
 
         Motor = HwMap.get(DcMotor.class, "PidMotor");
         Motor.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -155,7 +155,7 @@ public class PidController {
      * Change the current target into a new Target.
      * @param Target The new Target
      */
-    public void UpdateTarget(Float Target) {
+    public void updateTarget(Float Target) {
         this.Target = Target;
     }
 
