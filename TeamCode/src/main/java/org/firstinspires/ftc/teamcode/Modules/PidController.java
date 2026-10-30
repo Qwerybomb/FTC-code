@@ -61,6 +61,8 @@ public class PidController {
 
     /**
      * Primary control loop for the PID mechanism.
+     * The telemetry for the dashboard is updated here. for custom telemetry additions,
+     * please add them before calling Loop();
      */
     public void Loop() {
 
@@ -75,7 +77,7 @@ public class PidController {
         currentError = Target - CalculateProcessVariable(activeDeltaTime);
 
         float calculated_power = CalculateProportional() + CalculateDerivative() + CalculateIntegral();
-        Motor.setPower(remap(0, maxRPM, 0, 1, calculated_power));
+        Motor.setPower(Motor.getPower() + remap(0, maxRPM, 0, 1, calculated_power));
 
         // prints out telemetry. bottom target and top define the ranges
         if (printTelemetry) {
