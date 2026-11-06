@@ -69,8 +69,8 @@ public class MultiFunctionTuner extends LinearOpMode {
 
             if (currentMode == mode.Manual) {
                 Proportional += (0.005f * gamepad1.left_stick_y);
-                Integral += (0.005f * gamepad1.right_stick_y);
-                Derivative += (0.005f * (gamepad1.left_trigger - gamepad1.right_trigger));
+                Integral += (0.00005f * gamepad1.right_stick_y);
+                Derivative += (0.00005f * (gamepad1.left_trigger - gamepad1.right_trigger));
                 PID.setPidForTuning(Proportional, Integral, Derivative);
                 telemetry1.addData("P", PID.Kp);
                 telemetry1.addData("I", PID.Ki);
