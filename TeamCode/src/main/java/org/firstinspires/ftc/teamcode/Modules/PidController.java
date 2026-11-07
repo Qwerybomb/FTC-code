@@ -10,13 +10,13 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class PidController {
 
     // Pre-Calculated Gains //
-    public float Kp = 0;
-    public float Ki = 0;
-    public float Kd = 0;
+    public Gains gains = new Gains(0,0,0);
 
     // Timings (all in ms) //
     private float activeDeltaTime = 0;
     private float previousTimePoint = 0;
+    private float sampleTimingPrevious = 0;
+    private float sampleTime = 50;
     private ElapsedTime time;
 
     // Motor //
@@ -66,6 +66,11 @@ public class PidController {
      */
     public void Loop() {
 
+        if (sampleTimingPrevious + sampleTime > time.milliseconds()) {
+            return;
+        }
+        sampleTimingPrevious = (float) time.milliseconds();
+
         // calculate the active delta time.
         activeDeltaTime = (float) (time.milliseconds() - previousTimePoint);
         previousTimePoint = (float) time.milliseconds();
@@ -90,13 +95,6 @@ public class PidController {
             telemetry.addData("current delta time", activeDeltaTime);
             telemetry.update();
         }
-
-        // sleep for a set amount of time, independent of delta-time, although it does influence it.
-        try {
-            Thread.sleep((long) 100);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**
@@ -104,7 +102,7 @@ public class PidController {
      * @return the P in PID
      */
     private float CalculateProportional() {
-        return Kp * currentError;
+        return gains.Kp * currentError;
     }
 
     /**
@@ -112,7 +110,7 @@ public class PidController {
      * @return the I in PID
      */
     private float CalculateIntegral() {
-        integral = Ki * ((integral + currentError) * activeDeltaTime);
+        integral = gains.Ki * ((integral + currentError) * activeDeltaTime);
         return integral;
     }
 
@@ -121,7 +119,7 @@ public class PidController {
      * @return the D in PID
      */
     private float CalculateDerivative() {
-        return Kd * (currentError - previousError) / activeDeltaTime;
+        return gains.Kd * (currentError - previousError) / activeDeltaTime;
     }
 
     /**
@@ -159,35 +157,5 @@ public class PidController {
      */
     public void updateTarget(Float Target) {
         this.Target = Target;
-    }
-
-    /**
-     * set the proportional gain of the PID controller
-     * @param proportional proportional gain
-     */
-    public void setProportional(float proportional) {
-        Kp = proportional;
-    }
-
-    /**
-     * set the Integral gain of the PID controller
-     * @param integral Integral gain
-     */
-    public void setIntegral(float integral) {
-        Ki = integral;
-    }
-
-    /**
-     * set the Derivative gain of the PID controller
-     * @param derivative Derivative gain
-     */
-    public void setDerivative(float derivative) {
-        Kd = derivative;
-    }
-
-    public void setPidForTuning(float P, float I, float D) {
-        Kp = P;
-        Ki = I;
-        Kd = D;
     }
 }
