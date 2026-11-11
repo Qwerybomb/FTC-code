@@ -1,13 +1,10 @@
-package org.firstinspires.ftc.teamcode.Modules;
+package org.firstinspires.ftc.teamcode.PID;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-public class PidController {
+public abstract class PidController {
 
     // Pre-Calculated Gains //
     public Gains gains = new Gains(0,0,0);
@@ -16,47 +13,31 @@ public class PidController {
     private float activeDeltaTime = 0;
     private float previousTimePoint = 0;
     private float sampleTimingPrevious = 0;
-    private float sampleTime = 50;
+    private int sampleTime = 50;
     private ElapsedTime time;
-
-    // Motor //
-    private final DcMotor Motor;
-    private final float encodersPerRevolution = 537.7f;
-    private final float maxRPM = 312;
 
     // integration //
     private float integral = 0;
-
-    // Error visualization helper //
-    Telemetry telemetry;
-    boolean printTelemetry;
 
     // Error & Error calculatory values //
     public float Target;
     private float currentError;
     private float previousError;
 
-    // process value calculations //
-    private float motorPreviousEncoderCount = 0;
+    // calculated new error value //
+    protected float my_Ut = 0;
 
-    /**
-     * Assign initial values for all robot or externally dependent objects
-     * @param HwMap Hardware map of the robot, from which to retrieve the motor
-     * @param Target Desired Initial Target value
-     * @param printTelemetry boolean to define whether or not telemetry should be printed
-     */
-    public PidController(HardwareMap HwMap, Float Target, boolean printTelemetry) {
-        this.telemetry = FtcDashboard.getInstance().getTelemetry();
-        this.printTelemetry = printTelemetry;
+    // telemetry //
+    private final Telemetry telemetry;
 
-        updateTarget(Target);
+    public PidController(Float Target, int sampleSpeed) {
+       updateTarget(Target);
+       setMySampleSpeed(sampleSpeed);
 
-        Motor = HwMap.get(DcMotor.class, "PidMotor");
-        Motor.setDirection(DcMotorSimple.Direction.REVERSE);
-
-        // precautions
         time = new ElapsedTime(0);
         time.reset();
+
+        this.telemetry = FtcDashboard.getInstance().getTelemetry();
     }
 
     /**
@@ -81,21 +62,17 @@ public class PidController {
         // set the current error to the target - PV
         currentError = Target - CalculateProcessVariable(activeDeltaTime);
 
-        float calculated_power = CalculateProportional() + CalculateDerivative() + CalculateIntegral();
-        Motor.setPower(Motor.getPower() + remap(0, maxRPM, 0, 1, calculated_power));
+        my_Ut = CalculateProportional() + CalculateDerivative() + CalculateIntegral();
 
-        // prints out telemetry. bottom target and top define the ranges
-        if (printTelemetry) {
-            telemetry.addData("bounds_bottom", 0);
-            telemetry.addData("target", Target);
-            telemetry.addData("bounds_top", maxRPM);
-            telemetry.addData("currentError", currentError);
-            telemetry.addData("Process Variable (RPM)", Target - currentError);
-            telemetry.addData("Motor Power (u(t))", Motor.getPower());
-            telemetry.addData("current delta time", activeDeltaTime);
-            telemetry.update();
-        }
+        addEssentialTelemetry();
+
+        customLoopControls();
     }
+
+    /**
+     * Custom loop logic. Called once at the end of Loop(). remember to call Loop() instead of this function in all final implementations.
+     */
+    protected abstract void customLoopControls();
 
     /**
      * function to calculate the P in PID
@@ -123,20 +100,11 @@ public class PidController {
     }
 
     /**
-     * Calculate the Process Variable (RPM) using the previously known encoder count and the amount of encoder counts per revolution, as well at the known time-per-iteration (could be improved with added deltaTime).
+     * Calculate the Process Variable (RPM). This PV will be used in the pre-built Loop().
      * @param deltaTime the time the previous iteration took to process in milliseconds.
      * @return Process Variable
      */
-    private float CalculateProcessVariable(float deltaTime) {
-
-        // calculate the process variable
-        float processVariable =  ((Motor.getCurrentPosition() - motorPreviousEncoderCount) / encodersPerRevolution);
-        processVariable *=  (60000 / deltaTime);
-
-        // set previous values to be read next [function call] -> (iteration)
-        motorPreviousEncoderCount = Motor.getCurrentPosition();
-        return processVariable;
-    }
+    protected abstract float CalculateProcessVariable(float deltaTime);
 
     /**
      * remaps values from one range A to range B. example, a value of 500 in a 0-1000 scale can be remapped to 0.5 on a 0-1 scale.
@@ -147,7 +115,7 @@ public class PidController {
      * @param value value to remap.
      * @return remapped value
      */
-    private float remap(float low1, float high1, float low2, float high2, float value) {
+    protected float remap(float low1, float high1, float low2, float high2, float value) {
         return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
     }
 
@@ -157,5 +125,34 @@ public class PidController {
      */
     public void updateTarget(Float Target) {
         this.Target = Target;
+    }
+
+    /**
+     * retrieve the final calculated U(t) from the PID.
+     * @return final calculated U(t) from the PID.
+     */
+    public float getCalculatedUt() {
+        return my_Ut;
+    }
+
+    /**
+     * Set the sample speed in MILLISECONDS (ms). will sample every set of this Milliseconds.
+     * @param sampleTime new sample time in Milliseconds (ms)
+     */
+    public void setMySampleSpeed(int sampleTime) {
+        this.sampleTime = sampleTime;
+    }
+
+    private void addEssentialTelemetry() {
+        telemetry.addData("bounds_bottom", 0);
+        telemetry.addData("target", Target);
+        telemetry.addData("currentError", currentError);
+        telemetry.addData("Process Variable (RPM)", Target - currentError);
+        telemetry.addData("current delta time", activeDeltaTime);
+        telemetry.update();
+    }
+
+    public Telemetry getDashboardTelemetry() {
+        return telemetry;
     }
 }

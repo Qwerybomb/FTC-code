@@ -5,8 +5,9 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Modules.Gains;
-import org.firstinspires.ftc.teamcode.Modules.PidController;
+import org.firstinspires.ftc.teamcode.PID.Gains;
+import org.firstinspires.ftc.teamcode.PID.PidController;
+import org.firstinspires.ftc.teamcode.Modules.PidSingleMotor;
 
 @TeleOp(name="Manual Tuner", group="Linear OpMode")
 public class MultiFunctionTuner extends LinearOpMode {
@@ -52,7 +53,7 @@ public class MultiFunctionTuner extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         waitForStart();
 
-        PidController PID = new PidController(hardwareMap, 200f, true);
+        PidController PID = new PidSingleMotor(hardwareMap, 200f, 50);
         Telemetry telemetry1 = FtcDashboard.getInstance().getTelemetry();
         float Proportional = 0.0001f;
         float Integral = 0;
@@ -97,6 +98,7 @@ public class MultiFunctionTuner extends LinearOpMode {
                 PID.gains.Reconstruct(ultimateGain * 0.45f, (0.54f * ultimateGain) / oscillationPeriod, 0);
             }
             PID.Loop();
+            PID.getDashboardTelemetry().update();
         }
     }
 }
